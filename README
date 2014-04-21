@@ -1,0 +1,10 @@
+jsesoinn
+========
+
+ESOINN algorithm
+An enhanced self-organizing incremental neural network for online unsupervised learning.
+
+
+Original paper: "An enhanced self-organizing incremental neural network for online unsupervised learning" Shen Furaoa, Tomotaka Ogurab, Osamu Hasegawab, 2007
+
+Ported from c++: https://github.com/BelBES/ESOINN
