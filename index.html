@@ -1,583 +1,255 @@
-function vector(x, y){
-    if (typeof x == "undefined") x =0;
-    if (typeof y == "undefined") y =0;
-    return {
-        distance: function(to){
-            return Math.sqrt( (x-to.x)*(x-to.x)+(y-to.y)*(y-to.y));
-        },
-        add: function(to){
-            return vector(x+to.x, y+to.y);
-        },
-        sub: function(wit){
-            return vector(x-wit.x, y-wit.y);
-        },
-        mul: function(wit){
-            return vector(x*wit.x, y*wit.y);
-        },
-        div: function(wit){
-            return vector(x/wit.x, y/wit.y);
-        },
-        clone:function(){
-            return vector(x, y);
-        },
-        normalize:function(){
-            var l = this.distance;
-            return vector(x/l,y/l);
-        },
-        divScalar:function(scalar){
-            return vector(x/scalar, y/scalar);
-        },
-        scalarDiv:function(scalar){
-            return vector(scalar/x, scalar/y);
-        },
-        multiplyScalar:function(scalar){
-            return vector(scalar*x, scalar*y);
-        },
-        x: x,
-        y: y
-    };
-}
-
-function Graph(){
-    var uids = 0;
-    var edges = [];
-    var nodes = [];
-
-    var iexts = {};
-
-    function _addNodeToGraph(node){
-        nodes.push(node);
-        iexts[node.externalInterface.getId()] = node;
-        return node.externalInterface;
+<html>
+<head>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+    <script type="text/javascript" src="esoinn.js"></script>
+</head>
+<body onLoad="START()" style="padding:0px;margin:0px">
+    <div>
+        <canvas height='768' width='1024' id='canvas'>Обновите браузер</canvas>
+    </div>
+    <script type="text/javascript">
+    function getCursorPosition(e) {
+        var x;
+        var y;
+        if (e.pageX || e.pageY) {
+            x = e.pageX;
+            y = e.pageY;
         }
-    function _newEdge(edge, fromNodeEdges, toNodeEdges){
-        fromNodeEdges.push(edge);
-        toNodeEdges.push(edge);
-        edges.push(edge);
-        return edge;
+        else {
+            x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+            y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
         }
-    function _removeEdge(edge){
-        var iof = edges.indexOf(edge);
-        if (iof>=0){
-                _findNodeByExternalInterface(edge.from)._removeEdge(edge);
-                _findNodeByExternalInterface(edge.to)._removeEdge(edge);
-                return edges.splice(iof, 1);
-            }
-        return null;
-        }
-    function _findNodeByExternalInterface(iext){
-        return iexts[iext.getId()];
-
-        }
-    function _removeNode(node){
-        var iof = nodes.indexOf(node);
-        if (iof>=0){
-                node.externalInterface.linksIterator().iterate(function(node,i,iterator){
-                    iterator.remove();
-                });
-                delete iexts[node.externalInterface.getId()];
-                return nodes.splice(iof, 1);
-            }
-
-        }
-    function _setComponent(ccmap, node, curId){
-
+        return {x:x,y:y};
     }
-    function setClassId(node, ccmap, clsId){
-        if (ccmap[node.getId()]!=-1) return;
-        ccmap[node.getId()]=clsId;
-        node.adjacentNodesIterator().iterate(function(nde){
-            setClassId(nde, ccmap, clsId);
-        });
-    }
-
-    var graph = {
-        addNode: function(data){
-            return _addNodeToGraph( node(data) );
-        },
-        length: function(){
-            return nodes.length;
-        },
-        nodesIterator: function(){
-            return iterator(nodes, function(nodeInternal){ return nodeInternal.externalInterface;});
-        },
-        edgesIterator: function(){
-            return iterator(edges);
-        },
-        addEdge: function(fromNode, toNode, data){
-            var finded = null;
-            fromNode.linksIterator().iterate(function(link){
-                if ( (link.from.getId()==fromNode.getId() && link.to.getId()==toNode.getId()) ||
-                     (link.from.getId()==toNode.getId() && link.to.getId()==fromNode.getId()) ){
-                    finded = link;
-                    return false;
-                }
-                return true;
-            });
-            if (finded) return finded;
-
-            return fromNode.link(toNode,data);
-        },
-        removeEdgesBetween: function(from, to){
-            //console.log("remove edge");
-            var toId = to.getId();
-            from.linksIterator().iterate(function(node,i, it){
-                //console.log(node.getTo(from).getId(),toId);
-                if (node.getTo(from).getId()==toId){
-                    it.remove();
-                    return false;
-                }
-                return true;
-            });
-        },
-        outGraph: function(){
-            return {nodes: nodes, edges: edges, iexts: iexts};
-        },
-        buildConnectedComponents: function(){
-            var ccmap = {};
-            this.nodesIterator().iterate(function(node){
-                ccmap[node.getId()] = -1;
-            });
-
-            var curId =0;
-            this.nodesIterator().iterate(function(node){
-
-                if ( ccmap[node.getId()] ==-1){
-                    setClassId(node, ccmap, curId);
-                    curId++;
-                }
-
-            });
-            return {
-                classesCount: curId,
-                getFor:function(id){return ccmap[id];}
-            }
-        }
-    };
-
-
-    function node(data){
-        var id = ++uids;
-        var edges = [];
-        return {
-            nodeEdges: edges,
-            _removeEdge: function(edge){
-                var iof = edges.indexOf(edge);
-                if (iof>=0)
-                    return edges.splice(iof,1);
-                return null;
+    function START(){
+        var configs = {
+            ageMax:100,
+            iterationThreshold : 100,
+            c1: 0.001,
+            c2: 1,
+            zones: 4,
+            zoneSize: 25,
+            points: 1000,
+            repCounts: 1,
+            newPointsRecreateEsoinn: false,
+            showEsoinnGraph: true,
+            resamples: function(){
+                esoinn = Esoinn(this);
+                rebuildZones();
+                pointsGenerate();
+                trainEsoinn();
+                redraw();
             },
-            externalInterface:{
-                graph: graph,
-                data: data,
-                getId: function(){ return id;},
-                isConnectedWith: function(node){
-                    var self = this;
-                    finded = false;
-                    linksIterator().iterate(function(link){
-                        if (link.getTo(self).getId() == toId) finded=true;
+            removePoints: function(){
+                signals = [];
+                esoinn = Esoinn(this);
+                redraw();
+            },
+            rebuildEsoinn: function(){
+                esoinn = Esoinn(this);
+                trainEsoinn();
+                redraw();
+            }
+        }
+        //deffuncs
+            var example = document.getElementById("canvas");
+            var mousepressed = false;
+            var timeout = (new Date()).getTime();
+            example.addEventListener("mousedown",function(e){
+                mousepressed = true;
+            });
+            example.addEventListener("mouseup",function(e){
+                mousepressed = false;
+            });
+            example.addEventListener("mousemove",function(e){
+                if (mousepressed && ((new Date()).getTime()-timeout)>100){
+                    timeout = (new Date()).getTime();
+                    var c = getCursorPosition(e);
+                    var vec = scr.scrPConvert(vector(c.x, c.y)).div(vector(scaleX, scaleY));
+                    signals.push(vec);
+                    if (configs.newPointsRecreateEsoinn){
+                        esoinn = Esoinn(configs);
+                        trainEsoinn();
+                    }else{
+                        esoinn.addSignal(vec);
+                    }
+                    redraw();
+                }
+
+            });
+            example.addEventListener("click", function(e){
+                var c = getCursorPosition(e);
+                var vec = scr.scrPConvert(vector(c.x, c.y)).div(vector(scaleX, scaleY));
+                signals.push(vec);
+                if (configs.newPointsRecreateEsoinn){
+                    esoinn = Esoinn(configs);
+                    trainEsoinn();
+                }else{
+                    esoinn.addSignal(vec);
+                }
+                redraw();
+            }, false);
+            example.width=document.body.clientWidth;
+            example.height=document.body.clientHeight;
+            var ctx     = example.getContext('2d');
+            var scaleX = 10;
+            var scaleY = 10;
+        //datgui
+            //do not touch our points
+            function esoinConfChanged(){
+                esoinn = Esoinn(configs);
+                trainEsoinn();
+                redraw();
+            }
+
+            var gui = new dat.GUI();
+            gui.add(configs, 'ageMax', 1, 1000).step(10).onChange(esoinConfChanged);
+            gui.add(configs, 'iterationThreshold', 1, 1000).step(10).onChange(esoinConfChanged);
+            gui.add(configs, 'c1', 0.0001, 1).onChange(esoinConfChanged);
+            gui.add(configs, 'c2', 1, 100).onChange(esoinConfChanged);
+            gui.add(configs, 'zones', 1, 100).onChange(configs.resamples);
+            gui.add(configs, 'zoneSize', 10, 100).step(5).onChange(configs.resamples);
+            gui.add(configs, 'points', 100, 1000).onChange(configs.resamples);
+            gui.add(configs, 'repCounts', 1, 200).onChange(esoinConfChanged);
+            gui.add(configs, 'newPointsRecreateEsoinn');
+            gui.add(configs, 'showEsoinnGraph').onChange(function(){redraw();});
+            gui.add(configs, 'resamples');
+            gui.add(configs, 'removePoints');
+            gui.add(configs, "rebuildEsoinn");
+
+
+
+
+        //drawings
+            function clrscr(){
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, example.width, example.height);
+            }
+            var scr=(function(div, centerPoint){
+                return {
+                    convertVec:function(vec){
+                        return vector(this.gX(vec.x), this.gY(vec.y));
+                    },
+                    scrPConvert:function(vec){
+                        return vector(vec.x - centerPoint.x, div.height-vec.y-centerPoint.y);
+                    },
+                    gY:function(realY){
+                        return div.height-centerPoint.y-realY;
+                    },
+                    gX:function(realX){
+                        return centerPoint.x+realX;
+                    },
+                    left: (centerPoint.x-div.width)/scaleX,
+                    right: (div.width-centerPoint.x)/scaleX,
+                    top: (div.height-centerPoint.y)/scaleY,
+                    bottom: (0-centerPoint.y)/scaleY
+                };
+            })(example, vector(example.width/2, example.height/2));//
+            function drawAxis(){
+                //draw X axis
+                    ctx.beginPath();
+                    ctx.lineWidth=0.1;
+                    ctx.moveTo(scr.gX(scr.left*scaleX), scr.gY(0));
+                    ctx.lineTo(scr.gX(scr.right*scaleY), scr.gY(0));
+                    ctx.stroke();
+
+                //draw Y axis
+                    ctx.beginPath();
+                    ctx.lineWidth=0.1;
+                    ctx.moveTo(scr.gX(0), scr.gY(scr.top*scaleY));
+                    ctx.lineTo(scr.gX(0), scr.gY(scr.bottom*scaleY));
+                    ctx.stroke();
+
+                //draw x pts
+                    for (var i=Math.floor(scr.left); i<Math.ceil(scr.right); i++){
+                        var h = 4;
+                        if (i%10==0) h= 10;
+                        if (i%10==5) h= 6;
+                        ctx.beginPath();
+                        ctx.lineWidth=0.5;
+                        ctx.moveTo(scr.gX(i*scaleX), scr.gY(h));
+                        ctx.lineTo(scr.gX(i*scaleX), scr.gY(-h));
+                        ctx.stroke();
+                    }
+                //draw y pts
+                    for (var i=Math.min(Math.floor(scr.bottom), Math.floor(scr.top));i<Math.max(Math.ceil(scr.top),Math.ceil(scr.bottom));i++){
+                        var h = 4;
+                        if (i%10==0) h= 10;
+                        if (i%10==5) h= 6;
+                        ctx.beginPath();
+                        ctx.lineWidth=0.5;
+                        ctx.moveTo(scr.gX(-h), scr.gY(i*scaleY));
+                        ctx.lineTo(scr.gX(h), scr.gY(i*scaleY));
+                        ctx.stroke();
+                    }
+            }
+            function drawPoint(positionVec, color, r){
+                if (typeof color == "undefined") color = "black";
+                if (typeof r == "undefined") r= 1;
+                ctx.beginPath();
+                ctx.arc(scr.gX(positionVec.x*scaleX), scr.gY(positionVec.y*scaleY), r, 0, 2 * Math.PI, false);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+            function redraw(){
+                clrscr();
+                drawAxis();
+                for(var i=0;i<signals.length;i++){
+                    drawPoint(signals[i]);
+                }
+                if (configs.showEsoinnGraph){
+                    var g = esoinn.graph;
+                    g.nodesIterator().iterate(function(node){
+                        drawPoint(node.data.weight,"red",2);
+                        ctx.strokeStyle = "red";
+                        node.linksIterator().iterate(function(edge){
+                            var v1 = edge.from.data.weight;
+                            var v2 = edge.to.data.weight;
+
+                                ctx.beginPath();
+                                ctx.lineWidth=1;
+                                ctx.moveTo(scr.gX(v1.x*scaleX), scr.gY(v1.y*scaleY));
+                                ctx.lineTo(scr.gX(v2.x*scaleX), scr.gY(v2.y*scaleY));
+                                ctx.stroke();
+                        });
                     });
-                    return finded;
-                },
-                link:function(toNode, data){
-                    return _newEdge(edge(this, toNode, data), edges, _findNodeByExternalInterface(toNode).nodeEdges);
-                },
-                linksIterator: function(){
-                    return iterator(edges);
-                },
-                adjacentNodesIterator: function(){
-                    var curnode = this;
-                    return iterator(edges, function(edge){return edge.getTo(curnode);});
-                },
-                remove: function(){
-                    _removeNode(_findNodeByExternalInterface(this));
+                }
+
+
+            }
+
+        var esoinn = Esoinn(configs);
+        var zones = [];
+        var signals = [];
+
+        //generators
+            function rnd(min, max){  return Math.random() * (max - min) + min;}
+            function pointsGenerate(){
+                signals = [];
+                for (var i=0;i<20000;i++){
+                    signals.push(vector(rnd(-5,5)+25*Math.cos(i),rnd(-5,5)+25*Math.sin(i)));
                 }
             }
-        };
-    }
-
-    function edge(from, to, data){
-        return {
-                graph: graph,
-                from: from,
-                to: to,
-                data: data,
-                getTo: function(node){
-                    return node?((node==to)?from:to):to;
-                },
-                getFrom: function(node){
-                    return node?((node==from)?to:from):from;
-                },
-                remove: function(){
-                    _removeEdge(this);
-                }
-        };
-    }
-
-    function iterator(arr, filterFunc){
-        function getVal(jj){
-            if (filterFunc) return filterFunc(jj);
-            else return jj;
-        }
-        var i = 0;
-        return {
-            length: function(){ return arr.length;},
-            next: function(){
-                if (this.hasMore()){
-                    return getVal(arr[i++]);
-                } else return false;
-            },
-            hasMore: function(){ return (arr.length-1)>=i;},
-            remove: function(){  i--; getVal(arr[i]).remove(); },
-            iterate: function(callback){
-                var nextEdge;
-                while( (nextEdge = this.next())){
-                    callback(nextEdge, i, this);
+            function rebuildZones(){
+                zones = [];
+                for (var i=0;i<configs.zones;i++){
+                    zones.push(vector(rnd(scr.left, scr.right),rnd(scr.bottom, scr.top)));
                 }
             }
-        };
-    }
 
-    return graph;
-}
-
-function Esoinn(configs){
-    if (typeof configs == "undefined") configs = {ageMax: 30, iterationThreshold: 50, c1: 0.0001, c2: 1};
-    var ageMax=configs.ageMax;
-    var iterationCount=0;
-    var iterationThreshold = configs.iterationThreshold;
-    var graph = Graph();
-    var c1=configs.c1;
-    var c2=configs.c2;
-    var numberOfClasses = 0;
-
-    function distance(from, to){
-
-        return from.distance(to);
-    }
-
-    function findWinners(input){
-        var firstWinner, secondWinner;
-        firstWinnerDistance = Number.MAX_VALUE;
-        secondWinnerDistance = Number.MAX_VALUE;
-        graph.nodesIterator().iterate(function(node){
-
-            var dist = distance(input, node.data.weight);
-            if(dist < firstWinnerDistance) {
-                secondWinner = firstWinner;
-                secondWinnerDistance = firstWinnerDistance;
-                firstWinner = node;
-                firstWinnerDistance = dist;
-            } else if(dist < secondWinnerDistance) {
-                secondWinner = node;
-                secondWinnerDistance = dist;
-            }
-        });
-        return [firstWinner, secondWinner];
-    }
-    function getSimilarityThreshold(node){
-        var dist = 0;
-        if (node.linksIterator().length() === 0){
-            dist = Number.MAX_VALUE;
-            node.graph.nodesIterator().iterate(function(nde){
-                if (nde.getId()!=node.getId()){
-                    var distCurrent = distance(node.data.weight, nde.data.weight);
-                    if (distCurrent<dist)
-                        dist = distCurrent;
+        //esoin train
+            function trainEsoinn(){
+                for (var j=0;j<configs.repCounts;j++){
+                    for(var i=0;i<signals.length;i++){
+                        esoinn.addSignal(signals[i]);
+                    }
                 }
-            });
-        }else{
-            dist = Number.MIN_VALUE;
-            node.adjacentNodesIterator().iterate(function(nde){
-                var distCurrent = distance(nde.data.weight, node.data.weight);
-                if (distCurrent>dist)
-                    dist = distCurrent;
-            });
-        }
-        return dist;
-    }
-    function isWithinThreshold(inputSignal, first, second){
-        if(distance(inputSignal, first.data.weight) > getSimilarityThreshold(first)) {
-            return false;
-        }
-        if(distance(inputSignal, second.data.weight) > getSimilarityThreshold(second)) {
-            return false;
-        }
-        return true;
-    }
-    function incrementEdgesAge(node){
-        node.linksIterator().iterate(function(edge){
-            edge.data.age++;
-        });
-    }
-    function needAddEdge(first, second){
-        if ( first.data.classId == -1 || second.data.classId == -1 ) {
-            return true;
-        } else if(first.data.classId == second.data.classId) {
-            return true;
-        } else if(first.data.classId != second.data.classId && needMergeClasses(first, second)) {
-            return true;
-        }
-        return false;
-    }
-    function needMergeClasses(a, b){
-        var A = a.data.classId;
-        var meanA = meanDensity(A);
-        var maxA = maxDensity(A);
-        var thresholdA = densityThershold(meanA, maxA);
-
-        var B = b.data.classId;
-        var meanB = meanDensity(B);
-        var maxB = maxDensity(B);
-        var thresholdB = densityThershold(meanB, maxB);
-
-        var minAB = Math.min(a.data.density, b.data.density);
-        if(minAB > thresholdA * maxA || minAB > thresholdB * maxB) {
-            return true;
-        }
-        return false;
-    }
-    function meanDensity(classId) {
-        if(classId == -1) return 0.0;
-        var n = 0;
-        var density = 0.0;
-
-        graph.nodesIterator().iterate(function(node){
-            if (node.data.classId == classId) {
-                n++;
-                density += node.data.density;
+                esoinn.classify();
             }
-        });
+            function addPoint(vec){
 
-        return density/n;
-    }
-    function maxDensity(classId) {
-        var density = Number.MIN_VALUE;
-
-        graph.nodesIterator().iterate(function(node){
-            if(node.data.density > density && node.data.classId == classId) {
-                density = node.data.density;
             }
-        });
-
-        return density;
+            configs.resamples();
     }
-    function densityThershold(mean, max) {
-        var threshold=0;
-        if(2.0 * mean >= max) {
-            threshold = 0.0;
-        } else if(3.0 * mean >= max && max > 2.0 * mean) {
-            threshold = 0.5;
-        } else if (max > 3*mean) {
-            threshold = 1.0;
-        }
-        return threshold;
-    }
-    function updateDensity(node) {
-        var mDistance = meanDistance(node);
-        node.data.numberOfSignals++;
-        node.data.S += 1/((1 + mDistance)*(1 + mDistance));
-        node.data.density = node.data.S/node.data.numberOfSignals;
-    }
-    function meanDistance(node) {
-        var mDistance = 0.0;
-        var m = 0;
-
-        node.adjacentNodesIterator().iterate(function(nde){
-            mDistance += distance(node.data.weight, nde.data.weight);
-            m++;
-        });
-
-        return mDistance/m;
-        }
-    function updateWeights(first, inputSignal) {
-        first.data.weight = inputSignal.sub(first.data.weight).multiplyScalar(1/first.data.numberOfSignals).add(first.data.weight);
-        first.adjacentNodesIterator().iterate(function(node){
-            node.data.weight = inputSignal.sub(node.data.weight).multiplyScalar(1/(first.data.numberOfSignals*100)).add(node.data.weight);
-        });
-    }
-    function deleteOldEdges() {
-        graph.edgesIterator().iterate(function(edge,i,iterator){
-            if (edge.data.age>ageMax){
-                iterator.remove(edge);
-            }
-        });
-    }
-    function updateClassLabels() {
-        markClasses();
-        partitionClasses();
-        deleteNoiseVertex();
-    }
-    function markClasses() {
-        var vertexList=[];
-        graph.nodesIterator().iterate(function(node){
-            node.data.classId = -1;
-            vertexList.push(node);
-        });
-
-        vertexList = vertexList.sort(function(a,b){
-            if(a.data.density<b.data.density)
-                return -1; // Или любое число, меньшее нуля
-            if(a.data.density>b.data.density)
-                return 1;  // Или любое число, большее нуля
-            // в случае а = b вернуть 0
-            return 0;
-        });
-
-        var classCount = 0;
-        for(var i=0;i<vertexList.length;i++) {
-            if(vertexList[i].data.classId == -1) {
-                vertexList[i].data.classId = classCount;
-                markAdjacentVertices(vertexList[i], classCount++);
-            }
-        }
-    }
-    function markAdjacentVertices(node, cID) {
-        node.adjacentNodesIterator().iterate(function(nde){
-            if(nde.data.classId == -1 && nde.data.density < node.data.density) {
-                nde.data.classId = cID;
-                markAdjacentVertices(nde, cID);
-            }
-        });
-    }
-    function deleteNoiseVertex() {
-        graph.nodesIterator().iterate(function(node, i, iterator){
-            var mean = meanDensity(node.data.classId);
-            if(     (node.linksIterator().length() == 2 && node.data.density < c1* mean) ||
-                    (node.linksIterator().length() == 1 && node.data.density < c2* mean) ||
-                    (node.linksIterator().length() === 0)
-                ){
-                iterator.remove();
-            }
-        });
-    }
-
-    function partitionClasses() {
-        graph.edgesIterator().iterate(function(edge,i, it){
-            if (edge.from.data.classId != edge.to.data.classId){
-                if (needMergeClasses(edge.from, edge.to)){
-                    mergeClasses(edge.from.classId, edge.to.classId);
-                }
-                else{
-                    it.remove();
-                }
-            }
-        });
-    }
-    function mergeClasses( A,  B) {
-        var classId = Math.min(A, B);
-
-        graph.nodesIterator().iterate(function(node){
-            if (node.data.classId==A || node.data.classId==B)
-                node.data.classId = classId;
-        });
-
-    }
-    function classify() {
-        deleteNoiseVertex();
-        var ccmap = graph.buildConnectedComponents();
-        numberOfClasses = ccmap.classesCount;
-        graph.nodesIterator().iterate(function(node){
-            node.data.classId = ccmap.getFor(node.getId());
-        });
-    }
-
-    return {
-        addSignal: function(vec){
-            if (graph.length()<2){
-                graph.addNode({weight: vec, classId:-1, density: 0, numberOfSignals: 0, S:0});
-                return;
-            }
-            var winners = findWinners(vec);
-            //console.log(winners[0].getId(), winners[1].getId());
-            if (winners.length<2 || typeof winners[0] == "undefined" || typeof winners[1]=="undefined"){
-                console.log("ERROR");
-                return;
-            }
-            var firstWinner = winners[0] ,secondWinner = winners[1];
-
-            if (!isWithinThreshold(vec, firstWinner, secondWinner)){
-                graph.addNode({weight: vec, classId:-1, density: 0, numberOfSignals: 0, S:0});
-                return;
-            }
-            incrementEdgesAge(firstWinner);
-            if(needAddEdge(firstWinner, secondWinner)) {
-                var edge = graph.addEdge(firstWinner, secondWinner, {age:0});
-                edge.data.age=0;
-            } else {
-                graph.removeEdgesBetween(firstWinner, secondWinner);
-            }
-            updateDensity(firstWinner);
-            updateWeights(firstWinner, vec);
-            deleteOldEdges();
-            if(iterationCount % iterationThreshold === 0) {
-                updateClassLabels();
-            }
-            iterationCount++;
-        },
-        end:function(){
-            updateClassLabels();
-        },
-        getCenterOfCluster:function(classId) {
-            var density = -1;
-            var center = null;
-            graph.nodesIterator().iterate(function(node){
-                if (node.data.classId == classId && node.data.density > density){
-                    center = node;
-                    density = node.data.density;
-                }
-            });
-
-            return center.data.weight;
-        },
-        getBestMatch:function(signal) {
-            var firstWinner = null;
-            var firstWinnerDistance = Number.MAX_VALUE;
-
-            graph.nodesIterator().iterate(function(node){
-                var dist = distance(signal, node.data.weight);
-                if (dist<firstWinnerDistance){
-                    firstWinner = node;
-                    firstWinnerDistance = dist;
-                }
-            });
-
-            return firstWinner;
-        },
-        classify: classify,
-        numberOfClasses: numberOfClasses,
-        graph: graph
-    };
-}
-
-// var g = Graph();
-// var n1 = g.addNode({a:1});
-// var n2 = g.addNode({a:2});
-// g.addNode({a:3}).link(n1);
-// var l = n1.link(n2);
-
-// g.nodesIterator().iterate(function(n, i, iter){
-//     if (n.data.a==3) iter.remove();
-// });
-// var n4 = g.addNode({a:4}).link(n2).from;
-// g.removeEdgesBetween(n2,n4);
-// g.addEdge(n4,n1);
-// g.nodesIterator().iterate(function(n){
-//     console.log(n.data);
-//     n.linksIterator().iterate(function(t){
-//         console.log("   "+n.getId()+"->"+t.getTo(n).getId());
-//     });
-// });
-
-// //console.log(g.outGraph());
-
-// //process.exit(1);
-
-// var esoinn = Esoinn();
-// esoinn.addSignal(vector(2,2));
-// esoinn.addSignal(vector(2,3));
-// esoinn.addSignal(vector(5,5));
-// esoinn.addSignal(vector(6,5));
-// esoinn.addSignal(vector(7,5));
-
-// console.log(esoinn.getBestMatch(vector(6,6)));
+    </script>
+</body>
